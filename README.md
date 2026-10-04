@@ -4,6 +4,16 @@
 
 The project is under active development.
 
+## How it works
+
+The camera keeps a small, low-resolution video stream running. Using small images makes it quicker and cheaper for the Raspberry Pi to look for movement.
+
+The application compares each image from the stream with an earlier image. It counts how many pixels have changed by more than a chosen amount. If enough pixels change for several images in a row, the application treats that as an event, such as a bird landing.
+
+When an event is detected, the camera takes a full-resolution photo and records a short video. The application then sends the event details, photo, and video to another server in one HTTP request.
+
+The detection area, amount of change required, and delay between events will be configurable. This helps ignore movement outside the feeder, small lighting changes, and repeated triggers from the same bird.
+
 ## Requirements
 
 - Raspberry Pi running Raspberry Pi OS
