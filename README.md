@@ -52,6 +52,8 @@ Replace `OWNER` with the GitHub account or organisation that hosts the repositor
 
 The `--system-site-packages` option is important: without it, the virtual environment cannot see the Picamera2 package installed by Raspberry Pi OS.
 
+The first version sends events to an HTTP endpoint on the local network without authentication. See [`docs/http-api.md`](docs/http-api.md) for the multipart request sent to the server.
+
 ## Development
 
 Development can be done on macOS using `uv`. Camera-independent code and tests run locally; camera integration must be tested on a Raspberry Pi.
