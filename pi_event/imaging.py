@@ -1,7 +1,10 @@
 """Image capture and motion detection."""
 
 from dataclasses import dataclass
+from pathlib import Path
+from time import sleep
 from typing import Any, Self
+from uuid import UUID
 
 import numpy as np
 from numpy.typing import NDArray
@@ -14,6 +17,7 @@ REQUIRED_MOTION_FRAMES = 3
 REFERENCE_LEARNING_RATE = 0.05
 DETECTION_SIZE = (640, 480)
 CAPTURE_SIZE = (1920, 1080)
+VIDEO_DURATION_SECONDS = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +73,54 @@ class PiCamera:
 
         # YUV420 stores brightness in the first 480 rows and colour data after
         # them. Select those rows and every column for a 640×480 grayscale frame.
+        # This is all we need for motion detection.
         return np.asarray(frame[:height, :], dtype=np.uint8)
+
+    def capture_event_media(
+        self,
+        event_id: UUID,
+        output_directory: Path,
+    ) -> tuple[Path, Path]:
+        """Capture a JPEG and short H.264 video into one event directory."""
+        if not self._started:
+            raise RuntimeError("camera must be started before capturing media")
+
+        event_directory = output_directory / str(event_id)
+        event_directory.mkdir(parents=True, exist_ok=False)
+        image_path = event_directory / "image.jpg"
+        video_path = event_directory / "video.h264"
+
+        self._camera.capture_file(str(image_path), name="main")
+
+        encoder, output = self._video_encoder(video_path)
+        self._camera.start_encoder(encoder, output=output, name="main")
+        try:
+            sleep(VIDEO_DURATION_SECONDS)
+        finally:
+            self._camera.stop_encoder(encoder)
+
+        self._validate_media(image_path, video_path)
+        return image_path, video_path
+
+    @staticmethod
+    def _video_encoder(video_path: Path) -> tuple[Any, Any]:
+        try:
+            from picamera2.encoders import (  # type: ignore[import-not-found]
+                H264Encoder,
+            )
+            from picamera2.outputs import FileOutput  # type: ignore[import-not-found]
+        except ImportError as error:
+            raise RuntimeError(
+                "Picamera2 video support is required to capture event media"
+            ) from error
+
+        return H264Encoder(), FileOutput(str(video_path))
+
+    @staticmethod
+    def _validate_media(image_path: Path, video_path: Path) -> None:
+        for path in (image_path, video_path):
+            if not path.is_file() or path.stat().st_size == 0:
+                raise RuntimeError(f"camera did not write media file: {path}")
 
     def close(self) -> None:
         """Stop the camera and release its resources."""

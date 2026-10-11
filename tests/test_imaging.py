@@ -1,6 +1,8 @@
 import sys
+from pathlib import Path
 from types import ModuleType
 from typing import Any, ClassVar
+from uuid import UUID
 
 import numpy as np
 import pytest
@@ -43,6 +45,17 @@ class FakePicamera2:
                 np.full((height // 2, width), 200, dtype=np.uint8),
             ]
         )
+
+    def capture_file(self, path: str, *, name: str) -> None:
+        assert name == "main"
+        Path(path).write_bytes(b"jpeg-data")
+
+    def start_encoder(self, encoder: Any, *, output: Any, name: str) -> None:
+        assert name == "main"
+        output.path.write_bytes(b"h264-data")
+
+    def stop_encoder(self, encoder: Any) -> None:
+        pass
 
     def stop(self) -> None:
         self.stopped = True
@@ -96,6 +109,37 @@ def test_pi_camera_context_manager_releases_camera(
 
     assert picamera2.stopped is True
     assert picamera2.closed is True
+
+
+def test_pi_camera_captures_event_media(
+    fake_camera: tuple[PiCamera, FakePicamera2],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    class FakeEncoder:
+        pass
+
+    class FakeOutput:
+        def __init__(self, path: str) -> None:
+            self.path = Path(path)
+
+    module = ModuleType("picamera2.encoders")
+    module.H264Encoder = FakeEncoder  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "picamera2.encoders", module)
+    module = ModuleType("picamera2.outputs")
+    module.FileOutput = FakeOutput  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "picamera2.outputs", module)
+    monkeypatch.setattr("pi_event.imaging.sleep", lambda seconds: None)
+
+    camera, _ = fake_camera
+    camera.start()
+    event_id = UUID("72279045-6017-44c9-b5a5-43829a70d27b")
+
+    image_path, video_path = camera.capture_event_media(event_id, tmp_path)
+
+    assert image_path.read_bytes() == b"jpeg-data"
+    assert video_path.read_bytes() == b"h264-data"
+    assert image_path.parent == tmp_path / str(event_id)
 
 
 def test_first_frame_establishes_reference() -> None:

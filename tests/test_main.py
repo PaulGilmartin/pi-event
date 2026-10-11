@@ -1,6 +1,8 @@
 from collections.abc import Iterator
+from pathlib import Path
 from types import TracebackType
 from typing import Self
+from uuid import UUID
 
 import numpy as np
 import pytest
@@ -26,6 +28,14 @@ class FakeCamera:
     ) -> np.ndarray[tuple[int, int], np.dtype[np.uint8]]:
         return np.zeros((10, 10), dtype=np.uint8)
 
+    def capture_event_media(
+        self,
+        event_id: UUID,
+        output_directory: Path,
+    ) -> tuple[Path, Path]:
+        event_directory = output_directory / str(event_id)
+        return event_directory / "image.jpg", event_directory / "video.h264"
+
 
 def test_main_prints_motion_result_until_interrupted(
     monkeypatch: pytest.MonkeyPatch,
@@ -48,9 +58,11 @@ def test_main_prints_motion_result_until_interrupted(
     monkeypatch.setattr(main, "PiCamera", FakeCamera)
     monkeypatch.setattr(main, "MotionDetector", TriggeredDetector)
     monkeypatch.setattr(main, "sleep", interrupt_after_one_iteration)
+    monkeypatch.setattr(main, "EVENTS_DIRECTORY", Path("test-events"))
 
     main.main()
 
     output = capsys.readouterr().out
-    assert "Motion detected!" in output
+    assert "Motion detected! Saved event" in output
+    assert "to test-events/" in output
     assert "Stopped." in output
