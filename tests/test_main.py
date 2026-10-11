@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from pi_event import main
+from pi_event.imaging import MotionResult
 
 
 class FakeCamera:
@@ -37,11 +38,19 @@ def test_main_prints_motion_result_until_interrupted(
         next(sleeps)
         raise KeyboardInterrupt
 
+    class TriggeredDetector:
+        def process(
+            self,
+            frame: np.ndarray[tuple[int, int], np.dtype[np.uint8]],
+        ) -> MotionResult:
+            return MotionResult(score=0.5, triggered=True)
+
     monkeypatch.setattr(main, "PiCamera", FakeCamera)
+    monkeypatch.setattr(main, "MotionDetector", TriggeredDetector)
     monkeypatch.setattr(main, "sleep", interrupt_after_one_iteration)
 
     main.main()
 
     output = capsys.readouterr().out
-    assert "motion_score=0.000 triggered=False" in output
+    assert "Motion detected!" in output
     assert "Stopped." in output

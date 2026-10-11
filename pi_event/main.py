@@ -16,11 +16,8 @@ def main() -> None:
             while True:
                 frame = camera.capture_detection_frame()
                 result = detector.process(frame)
-                print(
-                    f"motion_score={result.score:.3f} "
-                    f"triggered={result.triggered}",
-                    flush=True,
-                )
+                if result.triggered:
+                    print("Motion detected!", flush=True)
                 sleep(DETECTION_INTERVAL_SECONDS)
     except KeyboardInterrupt:
         print("\nStopped.")
