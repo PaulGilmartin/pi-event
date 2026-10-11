@@ -63,6 +63,7 @@ def test_main_prints_motion_result_until_interrupted(
     main.main()
 
     output = capsys.readouterr().out
-    assert "Motion detected! Saved event" in output
-    assert "to test-events/" in output
+    assert "Motion detected! Capturing event..." in output
+    assert "Event " in output
+    assert "saved to test-events/" in output
     assert "Stopped." in output

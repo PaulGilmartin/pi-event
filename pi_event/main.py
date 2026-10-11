@@ -22,6 +22,7 @@ def main() -> None:
                 frame = camera.capture_detection_frame()
                 result = detector.process(frame)
                 if result.triggered:
+                    print("Motion detected! Capturing event...", flush=True)
                     event_id = uuid4()
                     image_path, video_path = camera.capture_event_media(
                         event_id,
@@ -35,8 +36,7 @@ def main() -> None:
                         event_id=event_id,
                     )
                     print(
-                        f"Motion detected! Saved event {event.event_id} "
-                        f"to {image_path.parent}",
+                        f"Event {event.event_id} saved to {image_path.parent}",
                         flush=True,
                     )
                 sleep(DETECTION_INTERVAL_SECONDS)
