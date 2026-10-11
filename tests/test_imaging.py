@@ -1,11 +1,101 @@
+import sys
+from types import ModuleType
+from typing import Any, ClassVar
+
 import numpy as np
 import pytest
 
-from pi_event.imaging import MotionDetector
+from pi_event.imaging import CAPTURE_SIZE, DETECTION_SIZE, MotionDetector, PiCamera
 
 
 def frame(value: int = 0) -> np.ndarray[tuple[int, int], np.dtype[np.uint8]]:
     return np.full((10, 10), value, dtype=np.uint8)
+
+
+class FakePicamera2:
+    instances: ClassVar[list["FakePicamera2"]] = []
+
+    def __init__(self) -> None:
+        self.configuration: dict[str, Any] | None = None
+        self.configured_with: dict[str, Any] | None = None
+        self.started = False
+        self.stopped = False
+        self.closed = False
+        self.instances.append(self)
+
+    def create_video_configuration(self, **configuration: Any) -> dict[str, Any]:
+        self.configuration = configuration
+        return configuration
+
+    def configure(self, configuration: dict[str, Any]) -> None:
+        self.configured_with = configuration
+
+    def start(self) -> None:
+        self.started = True
+
+    def capture_array(self, stream: str) -> np.ndarray[Any, np.dtype[np.uint8]]:
+        assert stream == "lores"
+        height = DETECTION_SIZE[1]
+        width = DETECTION_SIZE[0]
+        return np.vstack(
+            [
+                np.full((height, width), 42, dtype=np.uint8),
+                np.full((height // 2, width), 200, dtype=np.uint8),
+            ]
+        )
+
+    def stop(self) -> None:
+        self.stopped = True
+
+    def close(self) -> None:
+        self.closed = True
+
+
+@pytest.fixture
+def fake_camera(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[PiCamera, FakePicamera2]:
+    FakePicamera2.instances.clear()
+    module = ModuleType("picamera2")
+    module.Picamera2 = FakePicamera2  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "picamera2", module)
+    camera = PiCamera()
+    return camera, FakePicamera2.instances[-1]
+
+
+def test_pi_camera_configures_detection_and_capture_streams(
+    fake_camera: tuple[PiCamera, FakePicamera2],
+) -> None:
+    _, picamera2 = fake_camera
+    assert picamera2.configuration == {
+        "main": {"size": CAPTURE_SIZE},
+        "lores": {"size": DETECTION_SIZE, "format": "YUV420"},
+    }
+    assert picamera2.configured_with == picamera2.configuration
+
+
+def test_pi_camera_returns_luminance_plane(
+    fake_camera: tuple[PiCamera, FakePicamera2],
+) -> None:
+    camera, _ = fake_camera
+    camera.start()
+
+    captured = camera.capture_detection_frame()
+
+    assert captured.shape == (DETECTION_SIZE[1], DETECTION_SIZE[0])
+    assert np.all(captured == 42)
+
+
+def test_pi_camera_context_manager_releases_camera(
+    fake_camera: tuple[PiCamera, FakePicamera2],
+) -> None:
+    camera, picamera2 = fake_camera
+
+    with camera:
+        assert picamera2.started is True
+
+    assert picamera2.stopped is True
+    assert picamera2.closed is True
 
 
 def test_first_frame_establishes_reference() -> None:

@@ -1,6 +1,7 @@
 """Image capture and motion detection."""
 
 from dataclasses import dataclass
+from typing import Any, Self
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,6 +12,8 @@ PIXEL_THRESHOLD = 25
 MOTION_THRESHOLD = 0.05
 REQUIRED_MOTION_FRAMES = 3
 REFERENCE_LEARNING_RATE = 0.05
+DETECTION_SIZE = (640, 480)
+CAPTURE_SIZE = (1920, 1080)
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +22,68 @@ class MotionResult:
 
     score: float
     triggered: bool
+
+
+class PiCamera:
+    """Provide grayscale detection frames from a Raspberry Pi camera.
+
+    Picamera2 is imported only when this class is created, so the rest of the
+    package and its tests can run on a Mac without Raspberry Pi camera software.
+    The low-resolution YUV stream is used for detection while the larger main
+    stream remains available for photo and video capture later.
+    """
+
+    def __init__(self) -> None:
+        try:
+            from picamera2 import Picamera2  # type: ignore[import-not-found]
+        except ImportError as error:
+            raise RuntimeError(
+                "Picamera2 is required to use PiCamera; install "
+                "python3-picamera2 on the Raspberry Pi"
+            ) from error
+
+        self._camera: Any = Picamera2()
+        configuration = self._camera.create_video_configuration(
+            main={"size": CAPTURE_SIZE},
+            # Picamera2 calls its optional low-resolution stream "lores".
+            # We use it for motion detection while keeping the larger main
+            # stream available for captured photos and videos.
+            lores={"size": DETECTION_SIZE, "format": "YUV420"},
+        )
+        self._camera.configure(configuration)
+        self._started = False
+
+    def start(self) -> None:
+        """Start the configured camera streams."""
+        if not self._started:
+            self._camera.start()
+            self._started = True
+
+    def capture_detection_frame(self) -> GrayscaleFrame:
+        """Return the luminance plane of the low-resolution stream."""
+        if not self._started:
+            raise RuntimeError("camera must be started before capturing frames")
+
+        frame = self._camera.capture_array("lores")
+        height = DETECTION_SIZE[1]
+
+        # YUV420 stores brightness in the first 480 rows and colour data after
+        # them. Select those rows and every column for a 640×480 grayscale frame.
+        return np.asarray(frame[:height, :], dtype=np.uint8)
+
+    def close(self) -> None:
+        """Stop the camera and release its resources."""
+        if self._started:
+            self._camera.stop()
+            self._started = False
+        self._camera.close()
+
+    def __enter__(self) -> Self:
+        self.start()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
 
 
 class MotionDetector:
