@@ -51,6 +51,7 @@ class FakeEventHttpClient:
 def test_main_prints_motion_result_until_interrupted(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     sleeps: Iterator[None] = iter([None])
 
@@ -66,18 +67,34 @@ def test_main_prints_motion_result_until_interrupted(
         ) -> MotionResult:
             return MotionResult(score=0.5, triggered=True)
 
-    monkeypatch.setattr(main, "PiCamera", FakeCamera)
+    class FileWritingCamera(FakeCamera):
+        def capture_event_media(
+            self,
+            event_id: UUID,
+            output_directory: Path,
+        ) -> tuple[Path, Path]:
+            event_directory = output_directory / str(event_id)
+            event_directory.mkdir(parents=True)
+            image_path = event_directory / "image.jpg"
+            video_path = event_directory / "video.h264"
+            image_path.write_bytes(b"image")
+            video_path.write_bytes(b"video")
+            return image_path, video_path
+
+    monkeypatch.setattr(main, "PiCamera", FileWritingCamera)
     monkeypatch.setattr(main, "MotionDetector", TriggeredDetector)
     monkeypatch.setattr(main, "EventHttpClient", FakeEventHttpClient)
     monkeypatch.setattr(main, "sleep", interrupt_after_one_iteration)
-    monkeypatch.setattr(main, "EVENTS_DIRECTORY", Path("test-events"))
+    events_directory = tmp_path / "test-events"
+    monkeypatch.setattr(main, "EVENTS_DIRECTORY", events_directory)
     FakeEventHttpClient.sent_events.clear()
 
     main.main()
 
     assert len(FakeEventHttpClient.sent_events) == 1
+    assert list(events_directory.iterdir()) == []
     output = capsys.readouterr().out
     assert "Motion detected! Capturing event..." in output
     assert "Event " in output
-    assert "saved to test-events/" in output
+    assert "sent successfully" in output
     assert "Stopped." in output

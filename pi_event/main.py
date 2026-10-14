@@ -2,6 +2,7 @@
 
 import socket
 from pathlib import Path
+from shutil import rmtree
 from time import sleep
 from uuid import uuid4
 
@@ -38,8 +39,9 @@ def main() -> None:
                     )
                     print("Sending event", flush=True)
                     client.send(event)
+                    rmtree(image_path.parent)
                     print(
-                        f"Event {event.event_id} saved to {image_path.parent}",
+                        f"Event {event.event_id} sent successfully",
                         flush=True,
                     )
                 sleep(DETECTION_INTERVAL_SECONDS)

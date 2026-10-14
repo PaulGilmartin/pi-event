@@ -11,3 +11,4 @@ dist/
 .idea/
 /docs/picamera2-basics.md
 /scripts/receive_events.py
+/received-events/
