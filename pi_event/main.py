@@ -6,6 +6,7 @@ from time import sleep
 from uuid import uuid4
 
 from pi_event.events import CameraEvent
+from pi_event.http_client import EventHttpClient
 from pi_event.imaging import MotionDetector, PiCamera
 
 DETECTION_INTERVAL_SECONDS = 0.2
@@ -15,7 +16,7 @@ EVENTS_DIRECTORY = Path("events")
 def main() -> None:
     """Print motion scores from the Raspberry Pi camera until interrupted."""
     detector = MotionDetector()
-
+    client = EventHttpClient(server_url="http://192.168.8.48:8000/events")
     try:
         with PiCamera() as camera:
             while True:
@@ -35,6 +36,8 @@ def main() -> None:
                         video_path=video_path,
                         event_id=event_id,
                     )
+                    print("Sending event", flush=True)
+                    client.send(event)
                     print(
                         f"Event {event.event_id} saved to {image_path.parent}",
                         flush=True,
