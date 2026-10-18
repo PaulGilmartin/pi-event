@@ -11,4 +11,5 @@ dist/
 .idea/
 /docs/picamera2-basics.md
 /scripts/receive_events.py
+/scripts/run_on_pi.sh
 /received-events/

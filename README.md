@@ -52,7 +52,17 @@ Replace `OWNER` with the GitHub account or organisation that hosts the repositor
 
 The `--system-site-packages` option is important: without it, the virtual environment cannot see the Picamera2 package installed by Raspberry Pi OS.
 
-The first version sends events to an HTTP endpoint on the local network without authentication. See [`docs/http-api.md`](docs/http-api.md) for the multipart request sent to the server.
+Configure the backend endpoint and device API key before running:
+
+```bash
+export PI_EVENT_SERVER_URL=http://<backend-host>:8000/api/event
+export PI_EVENT_API_KEY=replace-with-the-device-key
+pi-event
+```
+
+Keep the API key out of source control. Plain HTTP is suitable only on a
+trusted local network; use HTTPS before sending the key over the internet.
+See [`docs/http-api.md`](docs/http-api.md) for the multipart request.
 
 ## Development
 

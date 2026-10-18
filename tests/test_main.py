@@ -41,8 +41,9 @@ class FakeCamera:
 class FakeEventHttpClient:
     sent_events: ClassVar[list[CameraEvent]] = []
 
-    def __init__(self, server_url: str) -> None:
-        assert server_url == "http://192.168.8.48:8000/events"
+    def __init__(self, server_url: str, api_key: str) -> None:
+        assert server_url == "http://backend.test/api/event"
+        assert api_key == "test-api-key"
 
     def send(self, event: CameraEvent) -> None:
         self.sent_events.append(event)
@@ -85,6 +86,11 @@ def test_main_prints_motion_result_until_interrupted(
     monkeypatch.setattr(main, "MotionDetector", TriggeredDetector)
     monkeypatch.setattr(main, "EventHttpClient", FakeEventHttpClient)
     monkeypatch.setattr(main, "sleep", interrupt_after_one_iteration)
+    monkeypatch.setenv(
+        "PI_EVENT_SERVER_URL",
+        "http://backend.test/api/event",
+    )
+    monkeypatch.setenv("PI_EVENT_API_KEY", "test-api-key")
     events_directory = tmp_path / "test-events"
     monkeypatch.setattr(main, "EVENTS_DIRECTORY", events_directory)
     FakeEventHttpClient.sent_events.clear()
@@ -98,3 +104,22 @@ def test_main_prints_motion_result_until_interrupted(
     assert "Event " in output
     assert "sent successfully" in output
     assert "Stopped." in output
+
+
+@pytest.mark.parametrize(
+    "missing_name",
+    ["PI_EVENT_SERVER_URL", "PI_EVENT_API_KEY"],
+)
+def test_main_requires_backend_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    missing_name: str,
+) -> None:
+    monkeypatch.setenv(
+        "PI_EVENT_SERVER_URL",
+        "http://backend.test/api/event",
+    )
+    monkeypatch.setenv("PI_EVENT_API_KEY", "test-api-key")
+    monkeypatch.delenv(missing_name)
+
+    with pytest.raises(RuntimeError, match=missing_name):
+        main.main()

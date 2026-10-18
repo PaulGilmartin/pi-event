@@ -25,10 +25,13 @@ class EventHttpClient:
     captured media; the paths themselves are not sent to the server.
     """
 
-    def __init__(self, server_url: str) -> None:
+    def __init__(self, server_url: str, api_key: str) -> None:
         if not server_url.strip():
             raise ValueError("server_url must not be empty")
+        if not api_key.strip():
+            raise ValueError("api_key must not be empty")
         self._server_url = server_url
+        self._api_key = api_key
 
     @cached_property
     def client(self) -> httpx.Client:
@@ -45,6 +48,7 @@ class EventHttpClient:
 
             response = self.client.post(
                 self._server_url,
+                headers={"Authorization": f"Bearer {self._api_key}"},
                 files=files,
             )
 

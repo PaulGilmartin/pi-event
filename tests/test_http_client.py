@@ -19,8 +19,6 @@ def make_event(tmp_path: Path) -> CameraEvent:
     video_path.write_bytes(b"h264-data")
 
     return CameraEvent(
-        device_id="garden-pi",
-        motion_score=0.42,
         image_path=image_path,
         video_path=video_path,
         event_id=UUID("72279045-6017-44c9-b5a5-43829a70d27b"),
@@ -37,7 +35,10 @@ def test_send_posts_multipart_event(
         return httpx.Response(201)
 
     client = httpx.Client(transport=httpx.MockTransport(accept))
-    event_client = EventHttpClient("http://192.168.8.100/events")
+    event_client = EventHttpClient(
+        "http://192.168.8.100/api/event",
+        "test-api-key",
+    )
     event_client.__dict__["client"] = client
 
     event_client.send(make_event(tmp_path))
@@ -45,12 +46,12 @@ def test_send_posts_multipart_event(
     request = requests[0]
     body = request.content
     assert request.method == "POST"
-    assert request.url == "http://192.168.8.100/events"
-    assert "Authorization" not in request.headers
+    assert request.url == "http://192.168.8.100/api/event"
+    assert request.headers["Authorization"] == "Bearer test-api-key"
     assert "Idempotency-Key" not in request.headers
     assert b'name="metadata"' in body
     assert b"application/json" in body
-    assert b'"device_id": "garden-pi"' in body
+    assert b'"schema_version": 1' in body
     assert b'name="image"; filename="capture.jpg"' in body
     assert b"image/jpeg" in body
     assert b"jpeg-data" in body
@@ -63,7 +64,10 @@ def test_send_raises_when_server_rejects_event(tmp_path: Path) -> None:
     def reject(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, request=request)
 
-    event_client = EventHttpClient("http://192.168.8.100/events")
+    event_client = EventHttpClient(
+        "http://192.168.8.100/api/event",
+        "test-api-key",
+    )
     event_client.__dict__["client"] = httpx.Client(
         transport=httpx.MockTransport(reject)
     )
@@ -82,12 +86,19 @@ def test_metadata_is_valid_json(tmp_path: Path) -> None:
         captured_metadata.update(json.loads(body[json_start:json_end]))
         return httpx.Response(200)
 
-    event_client = EventHttpClient("http://192.168.8.100/events")
+    event_client = EventHttpClient(
+        "http://192.168.8.100/api/event",
+        "test-api-key",
+    )
     event_client.__dict__["client"] = httpx.Client(
         transport=httpx.MockTransport(inspect)
     )
 
     event_client.send(make_event(tmp_path))
 
-    assert captured_metadata["event_type"] == "motion"
-    assert captured_metadata["motion_score"] == 0.42
+    assert captured_metadata["schema_version"] == 1
+    assert set(captured_metadata) == {
+        "schema_version",
+        "event_id",
+        "captured_at",
+    }
