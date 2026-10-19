@@ -54,8 +54,7 @@ class EventHttpClient:
 
         if not 200 <= response.status_code < 300:
             raise EventUploadError(
-                f"server rejected event {event.event_id} "
-                f"with status {response.status_code}"
+                f"server rejected event with status {response.status_code}"
             )
 
     @staticmethod

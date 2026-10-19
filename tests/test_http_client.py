@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from uuid import UUID
 
 import httpx
 import pytest
@@ -18,11 +17,7 @@ def make_event(tmp_path: Path) -> CameraEvent:
     image_path.write_bytes(b"jpeg-data")
     video_path.write_bytes(b"h264-data")
 
-    return CameraEvent(
-        image_path=image_path,
-        video_path=video_path,
-        event_id=UUID("72279045-6017-44c9-b5a5-43829a70d27b"),
-    )
+    return CameraEvent(image_path=image_path, video_path=video_path)
 
 
 def test_send_posts_multipart_event(
@@ -51,7 +46,6 @@ def test_send_posts_multipart_event(
     assert "Idempotency-Key" not in request.headers
     assert b'name="metadata"' in body
     assert b"application/json" in body
-    assert b'"schema_version": 1' in body
     assert b'name="image"; filename="capture.jpg"' in body
     assert b"image/jpeg" in body
     assert b"jpeg-data" in body
@@ -96,9 +90,4 @@ def test_metadata_is_valid_json(tmp_path: Path) -> None:
 
     event_client.send(make_event(tmp_path))
 
-    assert captured_metadata["schema_version"] == 1
-    assert set(captured_metadata) == {
-        "schema_version",
-        "event_id",
-        "captured_at",
-    }
+    assert set(captured_metadata) == {"captured_at"}

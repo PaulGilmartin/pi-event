@@ -46,21 +46,20 @@ def main() -> None:
                     event = CameraEvent(
                         image_path=image_path,
                         video_path=video_path,
-                        event_id=event_id,
                     )
                     print("Sending event", flush=True)
                     try:
                         client.send(event)
                     except (EventUploadError, httpx.HTTPError) as error:
                         print(
-                            f"Event {event.event_id} upload failed; "
+                            f"Event {event_id} upload failed; "
                             f"retained at {image_path.parent}: {error}",
                             flush=True,
                         )
                     else:
                         rmtree(image_path.parent)
                         print(
-                            f"Event {event.event_id} sent successfully",
+                            f"Event {event_id} sent successfully",
                             flush=True,
                         )
                 sleep(DETECTION_INTERVAL_SECONDS)

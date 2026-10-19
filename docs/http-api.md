@@ -21,8 +21,6 @@ Example metadata:
 
 ```json
 {
-  "schema_version": 1,
-  "event_id": "72279045-6017-44c9-b5a5-43829a70d27b",
   "captured_at": "2026-10-10T08:00:00+00:00"
 }
 ```
