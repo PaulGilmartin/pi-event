@@ -16,9 +16,9 @@ MOTION_THRESHOLD = 0.05
 REQUIRED_MOTION_FRAMES = 3
 REFERENCE_LEARNING_RATE = 0.05
 DETECTION_SIZE = (640, 480)
-# Match the IMX708 sensor's 4:3 aspect ratio to retain more vertical view than
-# the previous 16:9 capture stream.
-CAPTURE_SIZE = (2304, 1728)
+# Keep the IMX708 sensor's 4:3 aspect ratio while remaining within the
+# Raspberry Pi hardware H.264 encoder's supported resolution.
+CAPTURE_SIZE = (1280, 960)
 VIDEO_DURATION_SECONDS = 15.0
 
 
