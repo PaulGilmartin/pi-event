@@ -14,6 +14,7 @@ GrayscaleFrame = NDArray[np.uint8]
 PIXEL_THRESHOLD = 25
 MOTION_THRESHOLD = 0.05
 REQUIRED_MOTION_FRAMES = 3
+REQUIRED_QUIET_FRAMES = 3
 REFERENCE_LEARNING_RATE = 0.05
 DETECTION_SIZE = (640, 480)
 # Keep the IMX708 sensor's 4:3 aspect ratio while remaining within the
@@ -156,6 +157,10 @@ class MotionDetector:
     def __init__(self) -> None:
         self._reference_frame: NDArray[np.float32] | None = None
         self._consecutive_motion_frames = 0
+        self._consecutive_quiet_frames = 0
+        # Armed means sustained motion may trigger an event. A trigger disarms
+        # detection until enough quiet frames show that the visit has ended.
+        self._armed = True
 
     def process(self, frame: GrayscaleFrame) -> MotionResult:
         """Process one frame and return its motion score and trigger state."""
@@ -184,8 +189,10 @@ class MotionDetector:
 
         if significant_motion_detected:
             self._consecutive_motion_frames += 1
+            self._consecutive_quiet_frames = 0
         else:
             self._consecutive_motion_frames = 0
+            self._consecutive_quiet_frames += 1
 
             # Move every reference pixel a small fraction of the way towards
             # the matching current pixel. Repeating this during quiet frames
@@ -195,13 +202,27 @@ class MotionDetector:
                 current - self._reference_frame
             ) * REFERENCE_LEARNING_RATE
 
-        triggered = self._consecutive_motion_frames == REQUIRED_MOTION_FRAMES
+        if (
+            not self._armed
+            and self._consecutive_quiet_frames >= REQUIRED_QUIET_FRAMES
+        ):
+            self._armed = True
+
+        triggered = (
+            self._armed
+            and self._consecutive_motion_frames >= REQUIRED_MOTION_FRAMES
+        )
+        if triggered:
+            self._armed = False
+
         return MotionResult(score=score, triggered=triggered)
 
     def reset(self) -> None:
         """Forget the current scene and use the next frame as the reference."""
         self._reference_frame = None
         self._consecutive_motion_frames = 0
+        self._consecutive_quiet_frames = 0
+        self._armed = True
 
     @staticmethod
     def _validate_frame(frame: GrayscaleFrame) -> None:

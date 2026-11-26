@@ -172,6 +172,39 @@ def test_sustained_change_triggers_once() -> None:
     assert [result.triggered for result in results] == [False, False, True, False]
 
 
+def test_detector_rearms_after_quiet_frames() -> None:
+    detector = MotionDetector()
+    quiet = frame()
+    changed = frame(100)
+    detector.process(quiet)
+
+    first_visit = [detector.process(changed) for _ in range(4)]
+    quiet_period = [detector.process(quiet) for _ in range(3)]
+    second_visit = [detector.process(changed) for _ in range(3)]
+
+    assert [result.triggered for result in first_visit] == [
+        False,
+        False,
+        True,
+        False,
+    ]
+    assert not any(result.triggered for result in quiet_period)
+    assert [result.triggered for result in second_visit] == [
+        False,
+        False,
+        True,
+    ]
+
+
+def test_detector_does_not_retrigger_during_continuous_motion() -> None:
+    detector = MotionDetector()
+    detector.process(frame())
+
+    results = [detector.process(frame(100)) for _ in range(10)]
+
+    assert sum(result.triggered for result in results) == 1
+
+
 def test_quiet_frame_resets_consecutive_change() -> None:
     detector = MotionDetector()
     quiet = frame()
